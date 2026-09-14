@@ -1,138 +1,100 @@
-import sqlite3
-import datetime
 import streamlit as st
+import sqlite3
+import pandas as pd
+import plotly.express as px
 
 # ==========================================
-# 1. CONFIGURAÇÃO DO BANCO DE DADOS REAL
+# CONFIGURAÇÃO E CONEXÃO COM O BANCO DE DADOS
 # ==========================================
-def conectar_e_criar_tabela():
-    conexao = sqlite3.connect("robo_industrial.db")
-    cursor = conexao.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS pecas_industriais (
-            codigo TEXT PRIMARY KEY,
-            nome TEXT NOT NULL,
-            vida_util_maxima REAL NOT NULL,
-            horas_trabalhadas REAL DEFAULT 0.0,
-            data_inicio TEXT NOT NULL,
-            porcentagem_desgaste REAL DEFAULT 0.0,
-            status TEXT NOT NULL
-        )
-    """)
-    conexao.commit()
-    conexao.close()
+# Cria o arquivo do banco de dados (se não existir) e conecta
+conn = sqlite3.connect("gestao_industrial.db", check_same_thread=False)
+cursor = conn.cursor()
 
-conectar_e_criar_tabela()
+# Cria a tabela de peças (se ela não existir)
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS pecas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    codigo TEXT UNIQUE,
+    horas_trabalhadas REAL,
+    desgaste_percentual REAL
+)
+""")
+conn.commit()
+
 
 # ==========================================
-# 2. INTERFACE VISUAL DO SITE (STREAMLIT)
+# INTERFACE DO STREAMLIT (SEU MENU LATERAL)
 # ==========================================
-st.set_page_config(page_title="Robô de Gestão Industrial", page_icon="🤖", layout="wide")
-
 st.title("🤖 Robô de Gestão Industrial")
-st.subheader("Controle de Horas Trabalhadas e Desgaste de Peças")
 st.write("Suporte para: Fábricas de Cimento, Cerâmicas, Engenharia, Supermercados e Serviços.")
 
-# Criando abas no site para organizar as funções
-aba_nova, aba_atualizar, aba_relatorio = st.tabs([
-    "🆕 Início de Atuação (Peça Nova)", 
-    "⏱️ Registrar Horas / Turno", 
-    "📊 Painel de Controle e Desgaste"
-])
+# Criando as abas/páginas com base no seu menu
+aba_cadastro, aba_painel = st.tabs(["📝 Cadastrar Peça", "📊 Painel de Controle e Desgaste"])
 
-# ----- ABA 1: REGISTRAR PEÇA NOVA -----
-with aba_nova:
-    st.header("Cadastrar Nova Peça em Operação")
-    with st.form("form_nova_peca"):
-        codigo = st.text_input("Código Único da Peça (Ex: CIM-101)").strip()
-        nome = st.text_input("Nome da Peça / Maquinário (Ex: Correia do Forno)").strip()
-        vida_util = st.number_input("Vida Útil Máxima Recomendada (Em Horas)", min_value=1.0, value=1000.0)
-        botao_cadastrar = st.form_submit_button("Iniciar Atuação da Peça")
-        
-        if botao_cadastrar:
-            if not codigo or not nome:
-                st.error("Por favor, preencha todos os campos obrigatórios.")
-            else:
-                conexao = sqlite3.connect("robo_industrial.db")
-                cursor = conexao.cursor()
-                data_atual = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                try:
-                    cursor.execute("""
-                        INSERT INTO pecas_industriais (codigo, nome, vida_util_maxima, horas_trabalhadas, data_inicio, porcentagem_desgaste, status)
-                        VALUES (?, ?, ?, 0.0, ?, 0.0, 'Nova - Em operação regular')
-                    """, (codigo, nome, vida_util, data_atual))
-                    conexao.commit()
-                    st.success(f"✅ Peça '{nome}' registrada com sucesso! Começou a atuar em: {data_atual}")
-                except sqlite3.IntegrityError:
-                    st.error(f"❌ Erro: O código '{codigo}' já está cadastrado no sistema.")
-                finally:
-                    conexao.close()
 
-# ----- ABA 2: REGISTRAR HORAS TRABALHADAS -----
-with aba_atualizar:
-    st.header("Registrar Horas de Funcionamento do Turno")
-    with st.form("form_horas"):
-        codigo_busca = st.text_input("Digite o Código da Peça que trabalhou").strip()
-        horas_rodadas = st.number_input("Quantas horas essa peça rodou neste turno?", min_value=0.1, value=8.0)
-        botao_atualizar = st.form_submit_button("Gravar Horas Trabalhadas")
-        
-        if botao_atualizar:
-            conexao = sqlite3.connect("robo_industrial.db")
-            cursor = conexao.cursor()
-            cursor.execute("SELECT nome, vida_util_maxima, horas_trabalhadas FROM pecas_industriais WHERE codigo = ?", (codigo_busca,))
-            resultado = cursor.fetchone()
-            
-            if not resultado:
-                st.error("❌ Código de peça não encontrado no banco de dados.")
-                conexao.close()
-            else:
-                nome_peca, vida_maxima, horas_atuais = resultado
-                novas_horas = horas_atuais + horas_rodadas
-                desgaste = round((novas_horas / vida_maxima) * 100, 2)
-                
-                if desgaste >= 100:
-                    status_novo = "🚨 CRÍTICO - Troca Obrigatória Excedida"
-                elif desgaste >= 80:
-                    status_novo = "⚠️ Atenção - Planejar Próxima Manutenção"
-                else:
-                    status_novo = "Funcionando perfeitamente"
-                
-                cursor.execute("""
-                    UPDATE pecas_industriais 
-                    SET horas_trabalhadas = ?, porcentagem_desgaste = ?, status = ?
-                    WHERE codigo = ?
-                """, (novas_horas, desgaste, status_novo, codigo_busca))
-                conexao.commit()
-                conexao.close()
-                
-                if desgaste >= 100:
-                    st.error(f"🚨 ALERTA MÁXIMO: A peça '{nome_peca}' atingiu {desgaste}% de desgaste! Risco de quebra imediata.")
-                elif desgaste >= 80:
-                    st.warning(f"⚠️ AVISO DO ROBÔ: A peça '{nome_peca}' chegou a {desgaste}% de desgaste. Planeje a troca.")
-                else:
-                    st.success(f"⚙️ Sucesso! Peça '{nome_peca}' atualizada. Desgaste acumulado em {desgaste}%.")
-
-# ----- ABA 3: RELATÓRIO VISUAL -----
-with aba_relatorio:
-    st.header("Painel Geral de Monitoramento")
-    conexao = sqlite3.connect("robo_industrial.db")
-    cursor = conexao.cursor()
-    cursor.execute("SELECT codigo, nome, vida_util_maxima, horas_trabalhadas, porcentagem_desgaste, status, data_inicio FROM pecas_industriais")
-    linhas = cursor.fetchall()
-    conexao.close()
+# ==========================================
+# 1) OPÇÃO: CADASTRO E VALIDAÇÃO DE PEÇAS
+# ==========================================
+with aba_cadastro:
+    st.subheader("Cadastrar Nova Peça em Operação")
     
-    if not linhas:
-        st.info("Nenhuma peça cadastrada no sistema até o momento.")
+    # Campos de entrada para o usuário
+    codigo_peca = st.text_input("Código Único da Peça", placeholder="Ex: CIM-101")
+    
+    # Simulando dados iniciais para a peça nova rodar no gráfico depois
+    horas_iniciais = st.number_input("Horas Iniciais de Trabalho", min_value=0.0, value=0.0)
+    desgaste_inicial = st.slider("Porcentagem Inicial de Desgaste (%)", min_value=0, max_value=100, value=0)
+    
+    botao_cadastrar = st.button("Cadastrar Peça")
+    
+    if botao_cadastrar:
+        # Limpa espaços em branco e deixa tudo em letras maiúsculas
+        codigo_limpo = codigo_peca.strip().upper()
+        
+        # Validações de segurança
+        if not codigo_limpo:
+            st.error("❌ Erro: O campo de código não pode ficar vazio!")
+        elif codigo_limpo == "EX: CIM-101":
+            st.error("❌ Erro: Digite um código válido, não use o exemplo!")
+        else:
+            try:
+                # Salva os dados de forma limpa no Banco de Dados SQL
+                cursor.execute(
+                    "INSERT INTO pecas (codigo, horas_trabalhadas, desgaste_percentual) VALUES (?, ?, ?)",
+                    (codigo_limpo, horas_iniciais, desgaste_inicial)
+                )
+                conn.commit()
+                st.success(f"✅ Peça '{codigo_limpo}' cadastrada e salva no banco de dados!")
+            except sqlite3.IntegrityError:
+                # O SQLite avisa se alguém tentar cadastrar o mesmo código duas vezes
+                st.error("❌ Erro: Este código de peça já está cadastrado no sistema!")
+
+
+# ==========================================
+# 2) OPÇÃO: PAINEL DE CONTROLE E GRÁFICOS
+# ==========================================
+with aba_painel:
+    st.subheader("Painel de Visualização de Desgaste")
+    
+    # Busca os dados salvos no banco de dados usando o Pandas
+    df = pd.read_sql_query("SELECT * FROM pecas", conn)
+    
+    if df.empty:
+        st.warning("⚠️ Nenhuma peça cadastrada no momento. Vá até a aba de cadastro!")
     else:
-        for peca in linhas:
-            with st.container():
-                st.markdown(f"### ⚙️ {peca[1]} (Código: {peca[0]})")
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("Horas Rodadas", f"{peca[3]} h", f"Meta: {peca[2]} h")
-                col2.metric("Desgaste Real", f"{peca[4]} %")
-                col3.write(f"*Status:* {peca[5]}")
-                col4.write(f"Instalação: {peca[6]}")
-                
-                progresso = min(float(peca[4]) / 100.0, 1.0)
-                st.progress(progresso)
-                st.divider()
+        # Mostra a tabela organizada com os dados guardados
+        st.write("### Peças Ativas no Sistema")
+        st.dataframe(df[["codigo", "horas_trabalhadas", "desgaste_percentual"]], use_container_width=True)
+        
+        # Cria um gráfico interativo e moderno usando Plotly
+        st.write("### Gráfico de Análise de Risco (Desgaste vs Horas)")
+        fig = px.bar(
+            df, 
+            x="codigo", 
+            y="desgaste_percentual", 
+            color="horas_trabalhadas",
+            title="Porcentagem de Desgaste por Peça Industrial",
+            labels={"codigo": "Código da Peça", "desgaste_percentual": "Desgaste (%)", "horas_trabalhadas": "Horas de Uso"},
+            color_continuous_scale="Reds" # Fica vermelho se tiver muitas horas
+        )
+        st.plotly_chart(fig, use_container_width=True)
