@@ -4,3 +4,63 @@
 ==================================================
 💧 ROTA ÁGUA: Volume estável. Ativar sistemas de microalgas biológicas para purificar o excesso de resíduos.
 💨 ROTA AR: Poluição alta e pouca vegetação. Iniciar reflorestamento massivo (Filtro Natural Obligatório).
+impor3t random
+import time
+import matplotlib.pyplot as plt
+
+def simular_e_plotar():
+    # 1. Gerando os dados do ecossistema
+    dados = {
+        "Volume de Água (%)": random.randint(15, 95),
+        "Poluição da Água (%)": random.randint(10, 90),
+        "Poluição do Ar (%)": random.randint(10, 90),
+        "Densidade de Árvores (%)": random.randint(5, 95)
+    }
+
+    # 2. Definindo cores para o gráfico (Azul para água, Vermelho para poluição, Verde para árvores)
+    cores = ['#3498db', '#e74c3c', '#d35400', '#2ecc71']
+
+    # 3. Criando a área do gráfico
+    plt.figure(figsize=(8, 5))
+    barras = plt.bar(dados.keys(), dados.values(), color=cores, width=0.6)
+
+    # Configurações visuais do gráfico
+    plt.title("🌍 PAINEL DE MONITORAMENTO GLOBAL ECOLÓGICO", fontsize=14, fontweight='bold', pad=15)
+    plt.ylabel("Nível / Porcentagem (%)", fontsize=12)
+    plt.ylim(0, 100) # Força o gráfico a ir de 0 a 100%
+    plt.grid(axis='y', linestyle='--', alpha=0.5)
+
+    # Adicionando o valor exato no topo de cada barra
+    for barra in barras:
+        altura = barra.get_height()
+        plt.text(barra.get_x() + barra.get_width()/2.0, altura + 2, f'{altura}%', ha='center', va='bottom', fontweight='bold')
+
+    # Mostra o gráfico na tela do Colab
+    plt.show()
+
+    # 4. Sistema Inteligente de Decisão (Caminho mais viável)
+    print("\n" + "="*50)
+    print("🤖 DIAGNÓSTICO E CAMINHO MAIS VIÁVEL ENCONTRADO:")
+    print("="*50)
+
+    # Lógica para a Água
+    if dados["Poluição da Água (%)"] > 50:
+        if dados["Volume de Água (%)"] < 40:
+            print("💧 ROTA ÁGUA: Alerta Crítico! Pouca água e muito suja. Implementar bacias de captação de chuva urgentemente.")
+        else:
+            print("💧 ROTA ÁGUA: Volume estável. Ativar sistemas de microalgas biológicas para purificar o excesso de resíduos.")
+    else:
+        print("💧 ROTA ÁGUA: Qualidade da água aceitável. Manter monitoramento de rotina.")
+
+    # Lógica para o Ar
+    if dados["Poluição do Ar (%)"] > 50:
+        if dados["Densidade de Árvores (%)"] < 40:
+            print("💨 ROTA AR: Poluição alta e pouca vegetação. Iniciar reflorestamento massivo (Filtro Natural Obligatório).")
+        else:
+            print("💨 ROTA AR: Densidade verde boa, mas poluição externa alta. Aplicar restrições temporárias a indústrias locais.")
+    else:
+        print("💨 ROTA AR: Ar limpo e estável. Focar em leis de preservação da mata nativa.")
+    print("="*50)
+
+# Executando a nova versão avançada
+simular_e_plotar()
