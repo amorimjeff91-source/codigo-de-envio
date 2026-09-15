@@ -1,1 +1,3 @@
+streamilr
+pandas
 plotly
